@@ -3,6 +3,8 @@ const app = express();
 const port = 3000;
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
+const parser = require('./parser')
+const extractEvents = require('./extractor');
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
@@ -13,10 +15,10 @@ app.get('/', (req, res) => {
 });
 
 
-app.post('/extract', upload.single('syllabus'), function (req, res, next) {
-  // req.file is the `syllabus` file
-  // req.body will hold the text fields, if there were any
-  console.log(req.file)
-  console.log(req.body)
-  res.json({ message: req.file })
+app.post('/extract', upload.single('syllabus'), async function (req, res, next) {
+
+  const syllabusText = await parser(req.file.path)
+  const jsonSyllabus = await extractEvents(syllabusText)
+
+  return res.json(jsonSyllabus)
 });
