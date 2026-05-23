@@ -1,6 +1,8 @@
 const express = require('express');
 const app = express();
 const port = 3000;
+const cors = require('cors');
+  app.use(cors());
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 const parser = require('./parser')

@@ -1,16 +1,26 @@
 import { useState } from "react"
+import ExportStep from "./components/ExportStep"
+import ReviewStep from "./components/ReviewStep"
+import UploadStep from "./components/UploadStep"
 
 function App(){
-  const [file, setFile] = useState(null);
+  const [step, setStep] = useState(1)
+  const [events, setEvents] = useState(null)
 
-  return(
-    <div>
-      <h1>Syllabus Calendar</h1>
-      <p>Upload your syllabus to extract events.</p>
-      <input type="file" accept="pdf"/>
-      <button>Upload Syllabus</button>
-    </div>
-  )
+  switch (step) {
+    case 1:
+      return <UploadStep currentStep={step} onUpload={handleEventsRecieved}/>
+    case 2:
+      console.log(events)
+      return <ReviewStep currentStep={step}/>
+    case 3:
+      return <ExportStep currentStep={step}/>
+  }
+
+  function handleEventsRecieved(eventsData){
+    setEvents(eventsData);
+    setStep(2);
+  }
 }
 
 export default App
