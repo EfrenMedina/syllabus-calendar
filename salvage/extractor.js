@@ -15,6 +15,9 @@ EVENT TYPES you must extract:
 - assignments (one-time, have due_date and due_time)
 - tests and exams (one-time, have due_date, start_time, end_time)
 - lectures (recurring, have days, start_time, end_time, recurrence_start, recurrence_end)
+- tutorials (recurring, have days, start_time, end_time, recurrence_start, recurrence_end)
+- labs (recurring, have days, start_time, end_time, recurrence_start, recurrence_end)
+
 
 JSON SCHEMA you must follow exactly:
 {
@@ -22,26 +25,26 @@ JSON SCHEMA you must follow exactly:
   "timezone": "America/Toronto",
   "events": [
     {
-      "type": "assignment",
+      "type": "assignments",
       "title": "Problem Set 1",
       "due_date": "2025-09-25",
       "due_time": "11:59 PM"
     },
     {
-      "type": "test",
+      "type": "tests",
       "title": "Term Test 1",
       "due_date": "2025-10-09",
       "start_time": "05:15 PM",
       "end_time": "06:45 PM"
     },
     {
-      "type": "lecture",
-      "title": "Lecture",
+      "type": "lectures",
+      // "title": "Lecture",
       "days": ["Tuesday", "Thursday"],
       "start_time": "11:00 AM",
       "end_time": "01:00 PM",
-      "recurrence_start": "2025-09-02",
-      "recurrence_end": "2025-11-27"
+      "start_date": "2025-09-02",
+      "end_date": "2025-11-27"
     }
   ]
 }`;
