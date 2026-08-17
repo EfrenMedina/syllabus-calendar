@@ -94,7 +94,17 @@ api/
   .dockerignore           # keep the image small (no __pycache__, .env, etc.)
 tests/                    # or colocate *.test.ts next to source
 .env.example              # Next.js needs no vercel.json — it deploys from source
+salvage/                  # REFERENCE ONLY, at the repo root (never shipped) — read Day 2, port into api/index.py, then delete
+  parse.py                #   pdfplumber logic  -> becomes parse_pdf()
+  extractor.js            #   the Claude prompt -> becomes the prompt constant
+  extractor.py            #   Python SDK-call reference
 ```
+
+> **Why `salvage/` sits at the root, not in `api/`:** Render builds the Docker image
+> with `api/` as its build context, so anything inside `api/` ships in the image. The
+> salvage files are throwaway reference — keeping them one level up keeps them out of
+> the image entirely. You never `import` them; you read them while writing `api/index.py`,
+> then delete the folder after Day 2 (Story 2.2).
 
 **Naming**
 
