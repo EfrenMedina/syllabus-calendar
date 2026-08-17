@@ -227,7 +227,7 @@ every line while learning the stack. **Total ≈ 43.5h** — tight for one week;
   ```
   `api/requirements.txt`: `fastapi`, `uvicorn[standard]`, `pdfplumber`, `anthropic`, `python-multipart` (add now; you need them Day 2).
 - **Subtasks:**
-  - [ ] Write the minimal FastAPI app exposing `app` and the `health` route (body: return the dict).
+  - [x] Write the minimal FastAPI app exposing `app` and the `health` route (body: return the dict).
   - [ ] Write the `Dockerfile` (slim Python base, install requirements, run uvicorn binding `0.0.0.0` and the `$PORT` Render provides) and a `.dockerignore`.
   - [ ] **Local, without Docker:** `uvicorn api.index:app --reload --port 8000`; `curl localhost:8000/health` → `{"status":"ok"}`.
   - [ ] **Local, with Docker:** `docker build -t syllabus-api api` then `docker run -p 8000:8000 syllabus-api`; hit `/health` again — proves the image works.
