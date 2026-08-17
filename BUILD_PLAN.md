@@ -152,7 +152,7 @@ Accounts: a **Vercel** account (free Hobby) linked to your GitHub. Your **Anthro
 **Setup steps**
 
 - [ ] Confirm you're on `week1-build` (`git branch --show-current`).
-- [ ] Read `salvage/README.md` and skim the three files — you'll port them on Day 2.
+- [x] Read `salvage/README.md` and skim the three files — you'll port them on Day 2.
 - [ ] Create `.env.example` (committed template, no secrets):
   ```
   # Used by the FastAPI service (local dev + Render env). The Next app never sees it.
@@ -182,10 +182,10 @@ every line while learning the stack. **Total ≈ 43.5h** — tight for one week;
 - **Files:** `package.json`, `app/layout.tsx`, `app/page.tsx`, `app/globals.css`, `next.config.ts`, `tsconfig.json`, `postcss.config.mjs`
 - **Signatures:** none (framework scaffold)
 - **Subtasks:**
-  - [ ] Run `npx create-next-app@latest .` in the repo root (TypeScript: yes, App Router: yes, Turbopack: yes, Tailwind: yes, ESLint: yes, `src/`: no, import alias: `@/*`). Let it merge into the existing git repo.
-  - [ ] Verify `app/globals.css` begins with `@import "tailwindcss";` (v4 idiom). Confirm `postcss.config.mjs` uses `@tailwindcss/postcss`.
-  - [ ] Delete the boilerplate in `app/page.tsx`; replace with a single `<h1>Syllabus Calendar</h1>` and one Tailwind class to prove styling works.
-  - [ ] `npm run dev`, open localhost, confirm the heading renders styled.
+  - [x] Run `npx create-next-app@latest .` in the repo root (TypeScript: yes, App Router: yes, Turbopack: yes, Tailwind: yes, ESLint: yes, `src/`: no, import alias: `@/*`). Let it merge into the existing git repo.
+  - [x] Verify `app/globals.css` begins with `@import "tailwindcss";` (v4 idiom). Confirm `postcss.config.mjs` uses `@tailwindcss/postcss`.
+  - [x] Delete the boilerplate in `app/page.tsx`; replace with a single `<h1>Syllabus Calendar</h1>` and one Tailwind class to prove styling works.
+  - [x] `npm run dev`, open localhost, confirm the heading renders styled.
 - **Tests:**
 
   | Test | Input | Expected |
