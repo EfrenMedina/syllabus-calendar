@@ -7,9 +7,10 @@ syllabus PDF, a Python/FastAPI service parses it and extracts assessments, deadl
 and recurring classes with the Claude API, the user **reviews and corrects** the
 extracted events in an editable table, and then exports them as a `.ics` calendar file.
 Week 1 ships the full flow — upload → extract → review/correct → `.ics` export —
-deployed to a public URL on Vercel. There is **no database and no auth**: the app is
-single-session and stateless by design, so the week's hours go into React, TypeScript,
-Tailwind, Next.js, and FastAPI — the skills this project exists to build. The one thing
+deployed: the Next.js app on Vercel and the FastAPI service in a Docker container on
+Render. There is **no database and no auth**: the app is single-session and stateless by
+design, so the week's hours go into React, TypeScript, Tailwind, Next.js, FastAPI, and
+Docker — the skills this project exists to build. The one thing
 carried over from the old repo is the extraction logic (prompt + pdfplumber parsing) in
 `salvage/`. You write every other line yourself.
 
@@ -48,15 +49,16 @@ carried over from the old repo is the extraction logic (prompt + pdfplumber pars
 | Auth | **None** | No data to protect without a database. Removed with Supabase. |
 | Frontend | Next.js 15 (App Router, Turbopack) + React 19 + TypeScript | Overlaps the UofT Blueprint stack; App Router + Route Handlers give you the backend-for-frontend you need. |
 | Styling | Tailwind CSS v4 (+ PostCSS, autoprefixer) | Requested learning target; v4's zero-config `@import "tailwindcss"` is the current idiom. |
-| PDF parse + LLM extract | Python / FastAPI, deployed as a **Vercel Python Function** | pdfplumber has no good Node equivalent (it flattens tables, and syllabi are tables). Co-deploying on Vercel keeps it to one platform and one deploy. |
-| FastAPI ↔ Next boundary | Browser → **Next Route Handler (`/api/extract`, TypeScript)** → **FastAPI (`/api/py/extract`, Python)** → Claude | The Route Handler is the backend-for-frontend: it validates the upload, keeps the API key server-side, and normalizes the response shape. FastAPI owns only parse + extract. |
+| PDF parse + LLM extract | Python / FastAPI, packaged as a **Docker image** and deployed on **Render** (Fly.io is an equivalent alt) | pdfplumber has no good Node equivalent (it flattens tables, and syllabi are tables). A container makes pdfplumber's system deps reproducible and is the actual prod artifact — defensible, unlike a Dockerfile a platform ignores. |
+| Containerization | **Docker** — one `Dockerfile` for the FastAPI service only | Real Docker practice on the one piece that benefits (native deps + reproducible runtime). The Next.js app stays source-deployed on Vercel; don't containerize it. |
+| FastAPI ↔ Next boundary | Browser → **Next Route Handler (`/api/extract`, TypeScript, on Vercel)** → **FastAPI (`/extract`, Python, in Docker on Render)** → Claude | The Route Handler is the backend-for-frontend: it validates the upload, keeps the API key server-side, and normalizes the response shape. It reaches the container via `EXTRACT_SERVICE_URL`. FastAPI owns only parse + extract. |
 | Review UI state | React **Context** (`SyllabusProvider`) at the root layout, holding the normalized `ExtractionResult` | No DB, so the corrected events live in memory across the 3 route steps. TanStack Table renders from context and writes edits back through context callbacks. |
 | `.ics` generation | **Hand-rolled** pure function (`lib/ics.ts`), RFC 5545 subset | A bounded, fully-testable TypeScript exercise (discriminated unions, date math, RRULE). Better learning than importing the `ics` package. |
 | Event times in the model | Normalized to 24-hour `HH:mm` | The LLM emits `11:59 PM`; converting once at the boundary means the table and `.ics` code never deal with AM/PM. |
 | `.ics` time zone handling | **Floating local time** (no `TZID`, no `Z`) | Correct-enough for a personal calendar in one time zone, needs zero time-zone math, keeps `buildICS` a clean pure function. Real `VTIMEZONE`/`TZID` is a Phase-2 upgrade. |
 | CI / Husky / lint-staged / GitHub Actions | **Deferred** (your choice) | Kept to local `lint`/`format` scripts + manual Vercel deploys for week 1. Add later; still résumé-able as "added CI in week 2." |
-| Deployment topology | **Vercel only** — Next.js app + Python function in one project | One platform, one `git push` deploy. |
-| Monthly cost | **$0** infra (Vercel Hobby free) **+ Anthropic API usage** (pay-per-call, ~$0.001–0.01 per syllabus on `claude-haiku-4-5`) | Only non-free cost is the LLM calls, which you already pay for. |
+| Deployment topology | **Next.js on Vercel** (source-deployed) **+ FastAPI Docker image on Render**, connected by `EXTRACT_SERVICE_URL` | Two platforms, but each does what it's best at, and the container is a real deploy artifact. Both auto-deploy from the same GitHub repo on push. |
+| Monthly cost | **$0** infra (Vercel Hobby + Render free web service) **+ Anthropic API usage** (~$0.001–0.01 per syllabus on `claude-haiku-4-5`) | Only non-free cost is the LLM calls. Trade-off: Render's free tier spins down after ~15 min idle, so the first extract after idle has a ~50s cold start — fine for a demo. |
 
 ---
 
@@ -87,10 +89,11 @@ lib/
   api.ts                  # client fetch helper
 api/
   index.py                # FastAPI app: parse_pdf, extract_events, endpoints
-  requirements.txt        # fastapi, pdfplumber, anthropic, python-multipart
+  requirements.txt        # fastapi, uvicorn, pdfplumber, anthropic, python-multipart
+  Dockerfile              # builds the FastAPI service image (runs uvicorn)
+  .dockerignore           # keep the image small (no __pycache__, .env, etc.)
 tests/                    # or colocate *.test.ts next to source
-vercel.json
-.env.example
+.env.example              # Next.js needs no vercel.json — it deploys from source
 ```
 
 **Naming**
@@ -152,7 +155,10 @@ Accounts: a **Vercel** account (free Hobby) linked to your GitHub. Your **Anthro
 - [ ] Read `salvage/README.md` and skim the three files — you'll port them on Day 2.
 - [ ] Create `.env.example` (committed template, no secrets):
   ```
+  # Used by the FastAPI service (local dev + Render env). The Next app never sees it.
   ANTHROPIC_API_KEY=sk-ant-xxxx
+  # Used by the Next.js Route Handler to reach the FastAPI service.
+  # Local: http://127.0.0.1:8000  ·  Prod (Vercel env var): your Render URL
   EXTRACT_SERVICE_URL=http://127.0.0.1:8000
   ```
 - [ ] Confirm `.env.local` holds your real `ANTHROPIC_API_KEY` and is gitignored (`git check-ignore .env.local` prints the path).
@@ -163,11 +169,12 @@ Each day has one deliverable and 1–3 stories. Stated hours are for someone han
 every line while learning the stack. **Total ≈ 43.5h** — tight for one week; the marked
 **⚠ uncertain** stories carry fallbacks, and Day 7 is a buffer that absorbs slippage.
 
-### Day 1 — Scaffold & first deploy · **~6h**
+### Day 1 — Scaffold & first deploy · **~7h**
 
-> **Deliverable:** an empty Next.js app live on a public Vercel URL, plus a Python
-> health function responding at `/api/py/health` — proving the whole topology deploys,
-> even though the app does nothing yet.
+> **Deliverable:** an empty Next.js app live on a public Vercel URL, **plus** the
+> FastAPI service running in a Docker container deployed on Render, answering at
+> `/health` — proving the whole two-service topology deploys, even though the app
+> does nothing yet.
 
 #### Story 1.1 — Scaffold Next.js 15 + TS + Tailwind v4
 - **Goal:** a running `create-next-app` project at the repo root with Tailwind v4 wired in.
@@ -187,57 +194,65 @@ every line while learning the stack. **Total ≈ 43.5h** — tight for one week;
   | tailwind active | inspect `<h1>` in browser | the utility class you added is applied |
 - **Done when:** `npm run build` exits 0; the dev server renders the styled heading; `tsc --noEmit` is clean.
 
-#### Story 1.2 — Vercel Python "hello" function (topology proof)
-- **Goal:** a FastAPI app deployed as a Vercel Python function, reachable at `/api/py/health`.
-- **Estimate:** 2h · **Depends on:** 1.1
-- **Files:** `api/index.py`, `api/requirements.txt`, `vercel.json`
+#### Story 1.2 — Dockerize FastAPI & deploy on Render (topology proof)
+- **Goal:** a minimal FastAPI app that runs in a Docker container locally and is deployed as a Render web service, answering `GET /health`.
+- **Estimate:** 3h · **Depends on:** 1.1
+- **Files:** `api/index.py`, `api/requirements.txt`, `api/Dockerfile`, `api/.dockerignore`
 - **Signatures:**
   ```python
   # api/index.py
   from fastapi import FastAPI
   app = FastAPI()
 
-  @app.get("/api/py/health")
+  @app.get("/health")
   def health() -> dict: ...   # returns {"status": "ok"}
   ```
-  ```jsonc
-  // vercel.json — route /api/py/* to the single FastAPI function
-  { "rewrites": [{ "source": "/api/py/:path*", "destination": "/api/index" }] }
+  ```dockerfile
+  # api/Dockerfile — declarations to fill in yourself
+  FROM python:3.11-slim
+  WORKDIR /app
+  # COPY requirements.txt, pip install, COPY app code
+  # EXPOSE 8000
+  # CMD -> uvicorn api index app on 0.0.0.0:$PORT   (Render sets $PORT)
   ```
-  `api/requirements.txt`: `fastapi`, `pdfplumber`, `anthropic`, `python-multipart` (add now; you need them Day 2).
+  `api/requirements.txt`: `fastapi`, `uvicorn[standard]`, `pdfplumber`, `anthropic`, `python-multipart` (add now; you need them Day 2).
 - **Subtasks:**
   - [ ] Write the minimal FastAPI app exposing `app` and the `health` route (body: return the dict).
-  - [ ] Add `vercel.json` rewrite and `api/requirements.txt`.
-  - [ ] Run `vercel dev` locally; `curl localhost:3000/api/py/health` → `{"status":"ok"}`.
+  - [ ] Write the `Dockerfile` (slim Python base, install requirements, run uvicorn binding `0.0.0.0` and the `$PORT` Render provides) and a `.dockerignore`.
+  - [ ] **Local, without Docker:** `uvicorn api.index:app --reload --port 8000`; `curl localhost:8000/health` → `{"status":"ok"}`.
+  - [ ] **Local, with Docker:** `docker build -t syllabus-api api` then `docker run -p 8000:8000 syllabus-api`; hit `/health` again — proves the image works.
+  - [ ] Create a Render **Web Service** from the repo, root dir `api/`, Docker runtime; deploy; set `ANTHROPIC_API_KEY` in Render's env (needed Day 2). Note the Render URL.
 - **Tests:**
 
   | Test | Input | Expected |
   |---|---|---|
-  | health local | `GET /api/py/health` via `vercel dev` | `200`, `{"status":"ok"}` |
-- **Done when:** the health route answers under `vercel dev`.
-- **⚠ Uncertain:** Vercel's Next+Python routing (the `vercel.json` rewrite reaching `api/index.py`) is the fiddliest part of the week. **Fallback:** if you can't get `/api/py/*` to hit FastAPI, deploy FastAPI separately on **Render** (free tier) and point `EXTRACT_SERVICE_URL` at the Render URL. The rest of the plan is unchanged — the BFF calls `EXTRACT_SERVICE_URL` regardless of where the Python lives.
+  | health (uvicorn) | `GET /health` on `:8000` | `200`, `{"status":"ok"}` |
+  | health (container) | `GET /health` against `docker run` | `200`, `{"status":"ok"}` |
+  | health (Render) | `GET /health` on the Render URL | `200`, `{"status":"ok"}` |
+- **Done when:** `/health` answers from the running container **and** from the deployed Render URL. **Record the Render URL** — it's your `EXTRACT_SERVICE_URL` in prod.
+- **⚠ Uncertain:** first-time Docker + Render setup can eat time (base image, `$PORT` binding, build context). **Fallback:** if the container fights you on Day 1, deploy the same FastAPI to Render's **native Python** runtime (no Dockerfile) to stay unblocked, and circle back to containerize it on Day 7. The app is identical either way.
 
-#### Story 1.3 — Deploy to a public URL
-- **Goal:** the scaffold + health function live on a public Vercel URL.
+#### Story 1.3 — Deploy the Next.js app on Vercel
+- **Goal:** the scaffold live on a public Vercel URL, wired to the Render service.
 - **Estimate:** 1h · **Depends on:** 1.1, 1.2
-- **Files:** none (Vercel dashboard + `.env`)
+- **Files:** none (Vercel dashboard + env vars)
 - **Subtasks:**
-  - [ ] `git add -A && git commit`; push `week1-build`; import the repo in Vercel.
-  - [ ] Add `ANTHROPIC_API_KEY` in Vercel → Project → Environment Variables (leave `EXTRACT_SERVICE_URL` unset for co-deploy, or set to the Render URL if you took the fallback).
-  - [ ] Deploy; open the public URL; hit `/api/py/health` on the deployed domain.
+  - [ ] `git add -A && git commit`; push `week1-build`; import the repo in Vercel (framework: Next.js, source-deployed — no Dockerfile involved for the frontend).
+  - [ ] Set `EXTRACT_SERVICE_URL` in Vercel → Environment Variables to your Render URL from 1.2. (The `ANTHROPIC_API_KEY` lives on **Render**, not Vercel — the Next app never calls Claude directly.)
+  - [ ] Deploy; open the public Vercel URL.
 - **Tests:**
 
   | Test | Input | Expected |
   |---|---|---|
   | prod page | `GET /` on the Vercel URL | styled heading renders |
-  | prod health | `GET /api/py/health` on the Vercel URL | `{"status":"ok"}` |
-- **Done when:** both routes answer on the public URL. **Record the URL in §10.**
+  | wiring | (later, Day 3) BFF can reach the Render `/health` | reachable via `EXTRACT_SERVICE_URL` |
+- **Done when:** the Vercel URL serves the app and `EXTRACT_SERVICE_URL` points at the live Render service. **Record both URLs in §10.**
 
 ---
 
 ### Day 2 — Extraction service · **~6.5h**
 
-> **Deliverable:** `POST /api/py/extract` accepts a PDF and returns schema-valid,
+> **Deliverable:** `POST /extract` accepts a PDF and returns schema-valid,
 > snake_case JSON for a real syllabus — deployed.
 
 #### Story 2.1 — FastAPI parse + extract
@@ -273,7 +288,7 @@ every line while learning the stack. **Total ≈ 43.5h** — tight for one week;
   def parse_pdf(data: bytes) -> str: ...          # pdfplumber, flatten tables to "cell | cell" rows
   def extract_events(text: str) -> RawExtraction: ...  # Claude structured output -> validated model
 
-  @app.post("/api/py/extract")
+  @app.post("/extract")
   async def extract(file: UploadFile) -> RawExtraction: ...
   ```
 - **Subtasks:**
@@ -297,15 +312,15 @@ every line while learning the stack. **Total ≈ 43.5h** — tight for one week;
 - **Estimate:** 2.5h · **Depends on:** 2.1
 - **Files:** none new
 - **Subtasks:**
-  - [ ] Drop 2–3 of your own syllabus PDFs into a scratch folder (not committed). `curl -F file=@syllabus.pdf localhost:3000/api/py/extract` under `vercel dev`.
+  - [ ] Drop 2–3 of your own syllabus PDFs into a scratch folder (not committed). Run the service locally (`uvicorn api.index:app --port 8000`, or the container) and `curl -F file=@syllabus.pdf localhost:8000/extract`.
   - [ ] Eyeball the JSON; note which fields the LLM gets wrong (feeds the §10 accuracy metric and prompt tweaks).
-  - [ ] Commit, push, redeploy; `curl` the deployed `/api/py/extract`.
+  - [ ] Commit + push; Render auto-rebuilds the image; `curl -F file=@syllabus.pdf <render-url>/extract`.
 - **Tests:**
 
   | Test | Input | Expected |
   |---|---|---|
-  | real pdf local | `curl -F file=@real.pdf` (vercel dev) | `200`, JSON with ≥1 event |
-  | real pdf prod | same against the Vercel URL | `200`, JSON with ≥1 event |
+  | real pdf local | `curl -F file=@real.pdf` (uvicorn/container on :8000) | `200`, JSON with ≥1 event |
+  | real pdf prod | same against the Render URL | `200`, JSON with ≥1 event |
 - **Done when:** the deployed endpoint returns valid extraction JSON for a real syllabus. **Delete `salvage/` after this story.**
 
 ---
@@ -399,7 +414,7 @@ every line while learning the stack. **Total ≈ 43.5h** — tight for one week;
   ```
 - **Subtasks:**
   - [ ] Read `request.formData()`, get the `file`. Validate: exists, `type === "application/pdf"`, size ≤ 10 MB. On failure return `{ ok:false, error:{ code:"BAD_FILE", ... } }` with `400`.
-  - [ ] Forward the file (as multipart) to `${process.env.EXTRACT_SERVICE_URL}/api/py/extract` (co-deploy: derive from request origin; else the env URL).
+  - [ ] Forward the file (as multipart) to `${process.env.EXTRACT_SERVICE_URL}/extract` (the Render URL in prod, `http://127.0.0.1:8000` in local dev).
   - [ ] On upstream non-2xx return `UPSTREAM_DOWN` / `502`; on 2xx parse JSON as `RawExtraction`, run `normalizeExtraction`, return `{ ok:true, data }`.
   - [ ] Wrap everything in try/catch; never leak the API key or a stack trace.
 - **Tests** (Vitest with a mocked upstream `fetch`):
@@ -627,7 +642,7 @@ every line while learning the stack. **Total ≈ 43.5h** — tight for one week;
 
   | Test | Input | Expected |
   |---|---|---|
-  | fresh clone runs | clone + `npm i` + `vercel dev` following README only | app boots without extra guesswork |
+  | fresh clone runs | clone, then `npm i` + `npm run dev` (frontend) and `docker run` (API) following README only | both boot without extra guesswork |
   | full flow prod | upload → correct → export on the URL | downloads a correct `.ics` |
 - **Done when:** a stranger could clone, run, and understand the app from the README alone; metrics recorded.
 
@@ -786,12 +801,13 @@ Read these instead of asking an AI. Versions move fast — confirm you're on the
 **Tailwind CSS v4**
 - Install (Next.js / PostCSS, the `@import "tailwindcss"` idiom) — `tailwindcss.com/docs/installation/framework-guides`
 
-**FastAPI + Python on Vercel**
-- Vercel Python runtime & FastAPI example — `vercel.com/docs/functions/runtimes/python`
+**FastAPI + Python in Docker on Render**
 - FastAPI first steps + request files (`UploadFile`) — `fastapi.tiangolo.com/tutorial/first-steps/` and `/tutorial/request-files/`
+- Uvicorn (the ASGI server the container runs) — `www.uvicorn.org`
 - Pydantic v2 models & discriminated unions — `docs.pydantic.dev/latest/concepts/unions/#discriminated-unions`
 - pdfplumber (`extract_text`, `extract_tables`) — `github.com/jsvine/pdfplumber`
-- (Fallback host) Render web services — `render.com/docs/web-services`
+- Dockerfile reference & best practices — `docs.docker.com/reference/dockerfile/` and `docs.docker.com/build/building/best-practices/`
+- Deploy a Docker image on Render (`$PORT`, root dir, auto-deploy) — `render.com/docs/deploy-an-image` and `render.com/docs/web-services`
 
 **Anthropic / Claude**
 - Messages API overview — `platform.claude.com/docs/en/api/messages`
@@ -819,8 +835,8 @@ Read these instead of asking an AI. Versions move fast — confirm you're on the
 **Stories & hours** (check off as you go):
 
 - [ ] 1.1 Scaffold Next.js + TS + Tailwind — 3h
-- [ ] 1.2 Vercel Python health function — 2h
-- [ ] 1.3 Deploy to public URL — 1h  · _Day 1 total: 6h_
+- [ ] 1.2 Dockerize FastAPI + deploy on Render — 3h
+- [ ] 1.3 Deploy Next.js on Vercel — 1h  · _Day 1 total: 7h_
 - [ ] 2.1 FastAPI parse + extract — 4h
 - [ ] 2.2 Real-PDF test & deploy — 2.5h  · _Day 2 total: 6.5h_
 - [ ] 3.1 Data model (`types.ts`) — 1.5h
@@ -835,9 +851,9 @@ Read these instead of asking an AI. Versions move fast — confirm you're on the
 - [ ] 7.1 Polish pass — 2.5h
 - [ ] 7.2 README + final deploy + metrics — 2.5h  · _Day 7 total: 5h_
 
-**Grand total ≈ 43.5h.** Tight for one week — treat Day 7 as buffer, and take the marked
-fallbacks (1.2 → Render, 5.1 → plain inputs) the moment a story overruns rather than
-sinking the schedule.
+**Grand total ≈ 44.5h.** Tight for one week — treat Day 7 as buffer, and take the marked
+fallbacks (1.2 → Render native Python, 5.1 → plain inputs) the moment a story overruns
+rather than sinking the schedule.
 
 **Metrics to record** (for the résumé bullet — capture as you finish):
 
@@ -847,7 +863,7 @@ sinking the schedule.
 | Extraction accuracy (real) | same on 3 of your own syllabi, averaged | ___ % |
 | Automated tests | `vitest` + `pytest` counts | ___ |
 | Event types supported | lecture / tutorial / lab / assignment / test | 5 |
-| Cold-start latency | first `/api/py/extract` after idle | ___ s |
+| Cold-start latency | first `/extract` after idle | ___ s |
 | Lighthouse (mobile) | Chrome DevTools on the deployed `/` | ___ / 100 |
 | Hand-written LOC | `git diff --stat` since scaffold (exclude generated) | ___ |
 | Public URL | your Vercel domain | ___ |
