@@ -37,3 +37,7 @@ yarn-error.log*
 # editor
 .idea/
 .vscode/
+
+#files
+BUILD_PLAN.md
+

@@ -231,7 +231,7 @@ every line while learning the stack. **Total ≈ 43.5h** — tight for one week;
   - [x] Write the `Dockerfile` (slim Python base, install requirements, run uvicorn binding `0.0.0.0` and the `$PORT` Render provides) and a `.dockerignore`.
   - [x] **Local, without Docker:** `uvicorn api.index:app --reload --port 8000`; `curl localhost:8000/health` → `{"status":"ok"}`.
   - [x] **Local, with Docker:** `docker build -t syllabus-api api` then `docker run -p 8000:8000 syllabus-api`; hit `/health` again — proves the image works.
-  - [ ] Create a Render **Web Service** from the repo, root dir `api/`, Docker runtime; deploy; set `ANTHROPIC_API_KEY` in Render's env (needed Day 2). Note the Render URL.
+  - [x] Create a Render **Web Service** from the repo, root dir `api/`, Docker runtime; deploy; set `ANTHROPIC_API_KEY` in Render's env (needed Day 2). Note the Render URL.
 - **Tests:**
 
   | Test | Input | Expected |
