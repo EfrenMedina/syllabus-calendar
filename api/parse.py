@@ -1,7 +1,6 @@
 import io
 import pdfplumber 
-from pdfminer.pdfparser import PDFSyntaxError
-from pdfminer.pdfdocument import PDFPasswordIncorrect
+from pdfplumber.utils.exceptions import PdfminerException
 import logging
 
 logger = logging.getLogger(__name__)
@@ -12,13 +11,12 @@ def parse_pdf(pdf_file: bytes):
     # The file as a pdfplumber.PDF class.
     try:
         pdf = pdfplumber.open(io.BytesIO(pdf_file))
-    except PDFSyntaxError:
-        logger.error("Failed to open the PDF.")
+    try:
+        pdf = pdfplumber.open(io.BytesIO(pdf_file))
+    except PdfminerException:
+        logger.error("Could not open the PDF (corrupt, encrypted, or not a PDF).")
         raise
-    except PDFPasswordIncorrect:
-        logger.error("Remove the password from the PDF and retry.")
-        raise
-         
+    
     with pdf:
         text_so_far = ""
         for page in pdf.pages:
