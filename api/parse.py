@@ -6,17 +6,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 def parse_pdf(pdf_file: bytes):
-    """Loads the pdf from a file path and returns a the pdf's contents as a single string."""
+    """Extract all text and tables from a PDF file, returned as one string."""
 
-    # The file as a pdfplumber.PDF class.
-    try:
-        pdf = pdfplumber.open(io.BytesIO(pdf_file))
     try:
         pdf = pdfplumber.open(io.BytesIO(pdf_file))
     except PdfminerException:
         logger.error("Could not open the PDF (corrupt, encrypted, or not a PDF).")
         raise
-    
+
     with pdf:
         text_so_far = ""
         for page in pdf.pages:

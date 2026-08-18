@@ -61,8 +61,11 @@ INSTRUCTIONS_PROMPT = """You are a structured data extractor. Your only job is t
                     """ 
 
 async def extract_events(text: str) -> RawCourse:
+    """Send syllabus text to Claude and return the validated course and events."""
+    
     user_prompt = f"Extract all calendar events from this syllabus:\n\n{text}"
 
+    # Anthropic API call
     try:
         response = await client.messages.create(
             model="claude-haiku-4-5",
