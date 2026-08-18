@@ -5,12 +5,14 @@ from pydantic import ValidationError
 from dotenv import load_dotenv
 from data_models import RawCourse
 
-try:
-    load_dotenv()
-except Exception as error:
-    raise RuntimeError
+logger = logging.getLogger(__name__)
+
+load_dotenv()
+api_key = os.getenv("ANTHROPIC_API_KEY")
+if not api_key:
+    raise RuntimeError("ANTHROPIC_API_KEY is not set")
     
-client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+client = anthropic.AsyncAnthropic(api_key=api_key)
 
 INSTRUCTIONS_PROMPT = """You are a structured data extractor. Your only job is to extract calendar events from university syllabus text and return a single valid JSON object.
                         STRICT RULES:
@@ -62,24 +64,39 @@ async def extract_events(text: str) -> RawCourse:
     user_prompt = f"Extract all calendar events from this syllabus:\n\n{text}"
 
     try:
-        events_JSON = await client.messages.create(
+        response = await client.messages.create(
             model="claude-haiku-4-5",
             max_tokens=16000,
             system=INSTRUCTIONS_PROMPT,
             messages=[{"role": "user", "content": user_prompt}],
             output_config={"format": {"type": "json_schema", "schema": RawCourse.model_json_schema()}}
         )
-    except anthropic.AunthenticatorError:
+    except anthropic.AuthenticationError:
         logger.error("Antropic config was rejected. Check config.")
         raise
+    except anthropic.APIError as e:
+        logger.error("Anthropic call failed: %s", e)
+        raise
 
-    raw_json = events_JSON.content[0].text
-    json = json.loads(raw_json)
+    if response.stop_reason == "max_tokens":
+        logger.error("Output truncated, please raise max output tokens.")
+        raise ValueError("extraction truncated")
+
+    if response.stop_reason == "refusal":
+        logger.error("Calude refuesed: %s", response.stop_details)
+        raise ValueError("Extraction refused")
+
+    if not response.content or response.content[0].type != "text":
+        logger.error("No text block (stop-reason: %s)", response.stop_reason)
+        raise ValueError("Empty extraction response")
 
     try:
-        RawCourse.model_validate_json(json)
-    except:
+        respone = RawCourse.model_validate_json(response.content[0].text)
+    except ValidationError as e:
+        logger.error("Schema error from Claude's JSON response: %s", e.errors())
+        raise
 
+    return respone
     
 
 
