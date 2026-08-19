@@ -2,10 +2,16 @@ from fastapi import FastAPI, UploadFile, HTTPException
 from pdfplumber.utils.exceptions import PdfminerException
 from pydantic import ValidationError
 import anthropic
+import logging
 
 from parse import parse_pdf
 from extractor import extract_events
 from data_models import RawCourse
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+)
 
 MAX_BYTES = 10 * 1024 * 1024
 
@@ -19,10 +25,6 @@ def health()->dict[str, str]:
 async def extract(file: UploadFile) -> RawCourse:
     """Validate an uploaded PDF, parse its text, and return the extracted course events."""
 
-    # Empty check
-    if not file:
-            raise HTTPException(400, "File is empty")
-
     if file.content_type != "application/pdf":
         raise HTTPException(400, "Only PDF files are accepted")
 
@@ -31,6 +33,10 @@ async def extract(file: UploadFile) -> RawCourse:
         raise HTTPException(413, "File is too large")
 
     data = await file.read()
+
+    # Empty check
+    if not data:
+        raise HTTPException(400, "File is empty")
 
     # authoritative size check 
     if len(data) > MAX_BYTES:          

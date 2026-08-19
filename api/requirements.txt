@@ -4,3 +4,4 @@ uvicorn[standard]
 pdfplumber
 anthropic
 python-multipart
+python-dotenv
