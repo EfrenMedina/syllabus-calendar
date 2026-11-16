@@ -10,11 +10,15 @@ export interface RateLimitResult {
   retryAfterSeconds: number;
 }
 
-// Shared across all serverless instances when Upstash is configured (production).
+// Upstash's own names, or the KV_* names Vercel's Storage integration sets.
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
+
+// Shared across all serverless instances when Redis is configured (production).
 const upstash =
-  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+  redisUrl && redisToken
     ? new Ratelimit({
-        redis: Redis.fromEnv(),
+        redis: new Redis({ url: redisUrl, token: redisToken }),
         limiter: Ratelimit.slidingWindow(LIMIT, "10 m"),
         prefix: "syllabus-extract",
       })
@@ -27,7 +31,7 @@ let warned = false;
 
 function memoryLimit(key: string, now: number): RateLimitResult {
   if (!warned && process.env.NODE_ENV === "production") {
-    console.warn("UPSTASH_REDIS_REST_URL/TOKEN not set; rate limiting is per-instance only.");
+    console.warn("Redis env vars not set; rate limiting is per-instance only.");
     warned = true;
   }
   const recent = (memory.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
