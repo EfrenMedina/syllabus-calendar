@@ -26,4 +26,6 @@
 **/secrets.dev.yaml
 **/values.dev.yaml
 LICENSE
-README.md
+README.mdtests
+requirements-dev.txt
+.pytest_cache
