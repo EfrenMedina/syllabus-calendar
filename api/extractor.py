@@ -30,7 +30,7 @@ INSTRUCTIONS_PROMPT = """You are a structured data extractor. Extract every cale
                         RECURRING MEETINGS (lecture, tutorial, lab)
                         - These are classes that repeat on a weekly cycle.
                         - Emit exactly ONE event per class type for the entire term. Never create one event per week, per session, or per lecture topic.
-                        - Set days to every weekday the class meets, and set start_date and end_date to the first and last meeting of the term.
+                        - Add one entry to meetings for each weekday the class meets, with that day's start_time and end_time (days can have different times). Set start_date and end_date to the first and last meeting of the term.
                         - Use a simple title such as "Lecture", "Tutorial", or "Lab".
                         - If no meeting days can be determined for a class, omit the event entirely rather than emitting it with empty meetings.
                         - Always set a title. If the document gives no specific name, use the type.
