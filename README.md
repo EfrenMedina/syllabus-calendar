@@ -29,6 +29,20 @@ Claude (claude-haiku-4-5, structured output validated by Pydantic)
 - The Anthropic API key lives only on the FastAPI service. The Next.js app never calls
   Claude directly.
 
+## Abuse protection
+
+Every upload is a paid Claude call, so the public surface is locked down:
+
+- **Only the BFF can call FastAPI.** `/extract` requires `Authorization: Bearer
+  $EXTRACT_SERVICE_TOKEN`, checked before the upload is read. If the token isn't
+  configured, the service refuses every request.
+- **Per-IP rate limit on the BFF:** 5 uploads per 10 minutes, shared across serverless
+  instances through Upstash Redis. Rejected files don't count toward the limit.
+- **Size caps:** 4 MB per file (Vercel's request limit is 4.5 MB), 30 pages, and 60k
+  characters of extracted text before anything is sent to Claude.
+- **No public API docs:** FastAPI's `/docs`, `/redoc` and `/openapi.json` are disabled.
+- **Spend cap:** set a monthly limit in the Anthropic Console as a last line of defense.
+
 | Path | What it is |
 |---|---|
 | `app/page.tsx`, `app/review/page.tsx`, `app/export/page.tsx` | The three steps |
@@ -50,7 +64,7 @@ You need Node 20+, Python 3.12+, and an Anthropic API key.
 cd api
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-echo "ANTHROPIC_API_KEY=sk-ant-..." > .env
+printf "ANTHROPIC_API_KEY=sk-ant-...\nEXTRACT_SERVICE_TOKEN=<same value as .env.local>\n" > .env
 uvicorn index:app --reload --port 8000
 ```
 
@@ -58,14 +72,14 @@ Or with Docker:
 
 ```bash
 docker build -t syllabus-api api
-docker run -p 8000:8000 -e ANTHROPIC_API_KEY=sk-ant-... syllabus-api
+docker run -p 8000:8000 -e ANTHROPIC_API_KEY=sk-ant-... -e EXTRACT_SERVICE_TOKEN=... syllabus-api
 ```
 
 **2. Web app** (port 3000)
 
 ```bash
 npm install
-cp .env.example .env.local   # EXTRACT_SERVICE_URL=http://127.0.0.1:8000
+cp .env.example .env.local   # set EXTRACT_SERVICE_TOKEN (openssl rand -hex 32)
 npm run dev
 ```
 
@@ -86,13 +100,15 @@ cd api && pytest         # parsing, Pydantic models, and endpoints (Claude is mo
 | Variable | Where | Value |
 |---|---|---|
 | `EXTRACT_SERVICE_URL` | Next.js (`.env.local`, Vercel) | Base URL of the FastAPI service, e.g. your Render URL |
+| `EXTRACT_SERVICE_TOKEN` | **Both** Next.js (Vercel) and FastAPI (Render) | The same random secret on both sides |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Next.js (Vercel) | From a free Upstash Redis database; enables the shared rate limit |
 | `ANTHROPIC_API_KEY` | FastAPI (`api/.env`, Render) | Your Anthropic key |
 
 ## Deploy
 
 - **API:** a Render Web Service with root directory `api/` and the Docker runtime. Set
-  `ANTHROPIC_API_KEY`. The container listens on `$PORT`. The free tier sleeps after
+  `ANTHROPIC_API_KEY` and `EXTRACT_SERVICE_TOKEN`. The container listens on `$PORT`. The free tier sleeps after
   about 15 minutes, so the first upload after idle can take up to a minute. The BFF waits
   up to 90 seconds.
 - **Web:** import the repo in Vercel with the Next.js preset, and set `EXTRACT_SERVICE_URL`
-  to the Render URL.
+  to the Render URL, `EXTRACT_SERVICE_TOKEN`, and the two Upstash variables.

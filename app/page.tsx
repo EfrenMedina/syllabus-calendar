@@ -34,6 +34,10 @@ export default function UploadPage() {
           Try a sample syllabus
         </button>
       </p>
+      <p className="mt-6 text-center text-xs text-zinc-500 dark:text-zinc-400">
+        Your PDF is sent to Claude (Anthropic) to find the dates. It isn&apos;t stored, and nothing is saved
+        after you leave the page.
+      </p>
     </div>
   );
 }
