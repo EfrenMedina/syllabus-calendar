@@ -12,8 +12,50 @@ def client():
     return TestClient(index.app)
 
 
-def upload(client, data: bytes, content_type="application/pdf", name="syllabus.pdf"):
-    return client.post("/extract", files={"file": (name, data, content_type)})
+AUTH = {"Authorization": "Bearer test-service-token"}
+
+
+def upload(client, data: bytes, content_type="application/pdf", name="syllabus.pdf", headers=AUTH):
+    return client.post("/extract", files={"file": (name, data, content_type)}, headers=headers)
+
+
+def test_rejects_missing_token(client, table_pdf):
+    assert upload(client, table_pdf, headers={}).status_code == 401
+
+
+def test_rejects_wrong_token(client, table_pdf):
+    assert upload(client, table_pdf, headers={"Authorization": "Bearer nope"}).status_code == 401
+
+
+def test_refuses_when_token_not_configured(client, monkeypatch, table_pdf):
+    monkeypatch.delenv("EXTRACT_SERVICE_TOKEN")
+    assert upload(client, table_pdf).status_code == 503
+
+
+def test_health_needs_no_token(client):
+    assert client.get("/health").status_code == 200
+
+
+def test_docs_are_disabled(client):
+    for path in ("/docs", "/redoc", "/openapi.json"):
+        assert client.get(path).status_code == 404
+
+
+def test_rejects_too_many_pages(client, long_pdf):
+    res = upload(client, long_pdf)
+    assert res.status_code == 413
+
+
+def test_rejects_too_much_text(client, monkeypatch, table_pdf):
+    monkeypatch.setattr(index, "parse_pdf", lambda data: "x" * (index.MAX_TEXT_CHARS + 1))
+    called = []
+
+    async def fake_extract(text):
+        called.append(text)
+
+    monkeypatch.setattr(index, "extract_events", fake_extract)
+    assert upload(client, table_pdf).status_code == 413
+    assert called == []
 
 
 def test_health(client):

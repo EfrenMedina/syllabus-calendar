@@ -5,6 +5,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Caps CPU and memory per request on Render's small instance. Syllabi are rarely over 15 pages.
+MAX_PAGES = 30
+
+
+class PdfTooLongError(ValueError):
+    """The PDF has more pages than any reasonable syllabus."""
+
 def parse_pdf(pdf_file: bytes) -> str:
     """Extract all text and tables from a PDF file, returned as one string."""
 
@@ -15,6 +22,10 @@ def parse_pdf(pdf_file: bytes) -> str:
         raise
 
     with pdf:
+        if len(pdf.pages) > MAX_PAGES:
+            logger.error("PDF has %d pages (limit %d).", len(pdf.pages), MAX_PAGES)
+            raise PdfTooLongError(f"more than {MAX_PAGES} pages")
+
         text_so_far = ""
         for page in pdf.pages:
             text = page.extract_text(x_tolerance=2)

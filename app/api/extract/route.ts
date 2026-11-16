@@ -1,6 +1,7 @@
 import { normalizeCourse, type RawCourse } from "@/lib/normalize";
 import type { ApiResponse, Course } from "@/lib/types";
 import { MAX_UPLOAD_BYTES } from "@/lib/limits";
+import { checkRateLimit, clientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 // Render's free tier can take ~50s to cold start.
@@ -8,11 +9,11 @@ export const maxDuration = 120;
 
 const UPSTREAM_TIMEOUT_MS = 90_000;
 
-type ErrorCode = "BAD_FILE" | "EXTRACT_FAILED" | "UPSTREAM_DOWN" | "SERVER_ERROR";
+type ErrorCode = "BAD_FILE" | "EXTRACT_FAILED" | "UPSTREAM_DOWN" | "SERVER_ERROR" | "RATE_LIMITED";
 
-function fail(status: number, code: ErrorCode, message: string): Response {
+function fail(status: number, code: ErrorCode, message: string, headers?: HeadersInit): Response {
   const body: ApiResponse<Course> = { ok: false, error: { code, message } };
-  return Response.json(body, { status });
+  return Response.json(body, { status, headers });
 }
 
 async function upstreamDetail(res: Response): Promise<string | undefined> {
@@ -42,13 +43,26 @@ export async function POST(request: Request): Promise<Response> {
       return fail(400, "BAD_FILE", "Only PDF files are supported.");
     }
     if (file.size > MAX_UPLOAD_BYTES) {
-      return fail(400, "BAD_FILE", "That PDF is over 10 MB.");
+      return fail(400, "BAD_FILE", "That PDF is over 4 MB.");
     }
 
     const serviceUrl = process.env.EXTRACT_SERVICE_URL;
-    if (!serviceUrl) {
-      console.error("EXTRACT_SERVICE_URL is not set");
+    const serviceToken = process.env.EXTRACT_SERVICE_TOKEN;
+    if (!serviceUrl || !serviceToken) {
+      console.error("EXTRACT_SERVICE_URL or EXTRACT_SERVICE_TOKEN is not set");
       return fail(500, "SERVER_ERROR", "The server isn't configured correctly.");
+    }
+
+    // Checked after validation so a wrong file type doesn't use up someone's quota.
+    const limit = await checkRateLimit(clientIp(request));
+    if (!limit.allowed) {
+      const minutes = Math.max(1, Math.ceil(limit.retryAfterSeconds / 60));
+      return fail(
+        429,
+        "RATE_LIMITED",
+        `Too many uploads. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`,
+        { "Retry-After": String(limit.retryAfterSeconds) },
+      );
     }
 
     const upstreamForm = new FormData();
@@ -58,6 +72,7 @@ export async function POST(request: Request): Promise<Response> {
     try {
       upstream = await fetch(`${serviceUrl.replace(/\/$/, "")}/extract`, {
         method: "POST",
+        headers: { Authorization: `Bearer ${serviceToken}` },
         body: upstreamForm,
         signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       });

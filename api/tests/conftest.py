@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # extractor.py refuses to import without a key. Tests never call Claude, so a dummy is enough.
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-not-real")
+os.environ["EXTRACT_SERVICE_TOKEN"] = "test-service-token"
 
 
 # BUILD_PLAN.md §8 raw extraction
@@ -76,3 +77,15 @@ def table_pdf() -> bytes:
 @pytest.fixture
 def blank_pdf() -> bytes:
     return build_pdf(lambda pdf: None)
+
+
+@pytest.fixture
+def long_pdf() -> bytes:
+    """More pages than parse.MAX_PAGES allows."""
+
+    def draw(pdf):
+        for i in range(31):
+            pdf.drawString(72, 720, f"Page {i + 1}")
+            pdf.showPage()
+
+    return build_pdf(draw)
