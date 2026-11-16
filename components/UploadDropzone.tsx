@@ -10,7 +10,7 @@ import type { Course } from "@/lib/types";
 
 function rejectionMessage(rejections: FileRejection[]): string {
   const code = rejections[0]?.errors[0]?.code;
-  if (code === "file-too-large") return "That PDF is over 10 MB.";
+  if (code === "file-too-large") return "That PDF is over 4 MB.";
   if (code === "too-many-files") return "Upload one PDF at a time.";
   return "Only PDF files are supported.";
 }
@@ -71,7 +71,7 @@ export function UploadDropzone(props: { onExtracted: (r: Course) => void }): Rea
           <p className="text-base font-medium">
             {isDragActive ? "Drop it here" : "Drop your syllabus PDF here"}
           </p>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">or click to browse · PDF up to 10 MB</p>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">or click to browse · PDF up to 4 MB</p>
         </div>
       )}
     </div>
