@@ -101,7 +101,7 @@ cd api && pytest         # parsing, Pydantic models, and endpoints (Claude is mo
 |---|---|---|
 | `EXTRACT_SERVICE_URL` | Next.js (`.env.local`, Vercel) | Base URL of the FastAPI service, e.g. your Render URL |
 | `EXTRACT_SERVICE_TOKEN` | **Both** Next.js (Vercel) and FastAPI (Render) | The same random secret on both sides |
-| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Next.js (Vercel) | From a free Upstash Redis database; enables the shared rate limit |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (or `KV_REST_API_URL`, `KV_REST_API_TOKEN`) | Next.js (Vercel) | From a free Upstash Redis database; Vercel's Storage → Upstash integration sets the `KV_*` names. Enables the shared rate limit |
 | `ANTHROPIC_API_KEY` | FastAPI (`api/.env`, Render) | Your Anthropic key |
 
 ## Deploy
@@ -111,4 +111,5 @@ cd api && pytest         # parsing, Pydantic models, and endpoints (Claude is mo
   about 15 minutes, so the first upload after idle can take up to a minute. The BFF waits
   up to 90 seconds.
 - **Web:** import the repo in Vercel with the Next.js preset, and set `EXTRACT_SERVICE_URL`
-  to the Render URL, `EXTRACT_SERVICE_TOKEN`, and the two Upstash variables.
+  to the Render URL and `EXTRACT_SERVICE_TOKEN`. Connect Upstash for Redis from the
+  project's Storage tab for the rate limit.
